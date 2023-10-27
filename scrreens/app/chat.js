@@ -1,6 +1,6 @@
 import { View, Text, Image } from 'react-native'
 import * as ImagePicker from 'expo-image-picker';
-import { getStorage, uploadBytesResumable, uploadBytes, getDownloadURL, uploadString } from "firebase/storage";
+import { uploadBytes, getDownloadURL } from "firebase/storage";
 import React, { useState, useCallback, useEffect } from 'react'
 import { GiftedChat, InputToolbar, Actions, Bubble, SystemMessage, Composer, Send, Message } from 'react-native-gifted-chat'
 import { FIREBASE_AUTH, FIREBASE_DB, FIREBASE_STORAGE } from '../../firebaseConfig'
@@ -8,12 +8,14 @@ import send from "../../assets/send.png"
 import camera from "../../assets/camera.png"
 import { ref } from "firebase/storage"
 import uuid from "uuid";
-// import {get} from "firebase/storage"
 
 import { addDoc, collection, onSnapshot, query, orderBy } from 'firebase/firestore'
 
 const Chat = () => {
+  const [messages, setMessages] = useState([])
+  const [text, setText] = useState('');
   const [image, setImage] = useState(null)
+  const [hasGalleryPermission, setHasGalleryPermission] = useState(null)
   console.log(image);
   const auth = FIREBASE_AUTH
   const uploadImageAsync = async (uri) => {
@@ -33,7 +35,7 @@ const Chat = () => {
       xhr.send(null);
     });
 
-    const fileRef = ref(getStorage(), uuid.v4());
+    const fileRef = ref(FIREBASE_STORAGE, uuid.v4());
     const result = await uploadBytes(fileRef, blob);
 
 
@@ -42,33 +44,6 @@ const Chat = () => {
 
     return await getDownloadURL(fileRef);
   }
-
-
-
-
-
-
-
-  const [hasGalleryPermission, setHasGalleryPermission] = useState(null)
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1
-    })
-    // result.canceled=false
-    if (!result.canceled) {
-      const uplodUrl = await uploadImageAsync(result.assets[0].uri)
-      setImage(uplodUrl)
-      // or add a doc 
-    } else {
-      alert('You did not select any image.');
-    }
-    // if (hasGalleryPermission === false) {
-    //   return <Text>no permmison</Text>
-    // }
-  }
-  const [messages, setMessages] = useState([])
-  const [text, setText] = useState('');
   useEffect(() => {
     const collectionRef = collection(FIREBASE_DB, "chats")
     const q = query(collectionRef, orderBy("createdAt", "desc"))
@@ -89,6 +64,31 @@ const Chat = () => {
     })
     return () => unscribe();
   }, [])
+
+
+
+
+
+
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1
+    })
+    // result.canceled=false
+    if (!result.canceled) {
+      const uplodUrl = await uploadImageAsync(result.assets[0].uri)
+      setImage(uplodUrl)
+      // or add a doc 
+    } else {
+      alert('You did not select any image.');
+    }
+    // if (hasGalleryPermission === false) {
+    //   return <Text>no permmison</Text>
+    // }
+  }
+
   const onSend = useCallback(async (messages = []) => {
     setMessages(previousMessages =>
       GiftedChat.append(previousMessages, messages),
@@ -99,6 +99,7 @@ const Chat = () => {
     await addDoc(collection(FIREBASE_DB, "chats"), {
       _id, createdAt, text, user, image
     })
+
     // setImage(null)
 
   }, [])
@@ -111,6 +112,7 @@ const Chat = () => {
       alwaysShowSend
       renderSend={(props) => (
         <Send
+
           {...props}
           disabled={!props.text}
           containerStyle={{
