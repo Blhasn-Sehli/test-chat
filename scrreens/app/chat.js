@@ -1,29 +1,65 @@
 import { View, Text, Image } from 'react-native'
 import * as ImagePicker from 'expo-image-picker';
-
+import { getStorage, uploadBytesResumable, uploadBytes, getDownloadURL, uploadString } from "firebase/storage";
 import React, { useState, useCallback, useEffect } from 'react'
 import { GiftedChat, InputToolbar, Actions, Bubble, SystemMessage, Composer, Send, Message } from 'react-native-gifted-chat'
-import { FIREBASE_AUTH, FIREBASE_DB } from '../../firebaseConfig'
+import { FIREBASE_AUTH, FIREBASE_DB, FIREBASE_STORAGE } from '../../firebaseConfig'
 import send from "../../assets/send.png"
 import camera from "../../assets/camera.png"
+import { ref } from "firebase/storage"
+import uuid from "uuid";
+// import {get} from "firebase/storage"
 
 import { addDoc, collection, onSnapshot, query, orderBy } from 'firebase/firestore'
 
 const Chat = () => {
-  const [hasGalleryPermission, setHasGalleryPermission] = useState(null)
   const [image, setImage] = useState(null)
-  // console.log(image);
+  console.log(image);
   const auth = FIREBASE_AUTH
+  const uploadImageAsync = async (uri) => {
+    // Why are we using XMLHttpRequest? See:
+    // https://github.com/expo/expo/issues/2402#issuecomment-443726662
+    const blob = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.onload = function () {
+        resolve(xhr.response);
+      };
+      xhr.onerror = function (e) {
+        console.log(e);
+        reject(new TypeError("Network request failed"));
+      };
+      xhr.responseType = "blob";
+      xhr.open("GET", uri, true);
+      xhr.send(null);
+    });
+
+    const fileRef = ref(getStorage(), uuid.v4());
+    const result = await uploadBytes(fileRef, blob);
+
+
+    // We're done with the blob, close and release it
+    blob.close();
+
+    return await getDownloadURL(fileRef);
+  }
+
+
+
+
+
+
+
+  const [hasGalleryPermission, setHasGalleryPermission] = useState(null)
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1
-    }
-
-    )
+    })
     // result.canceled=false
     if (!result.canceled) {
-      setImage(result.assets[0].uri)
+      const uplodUrl = await uploadImageAsync(result.assets[0].uri)
+      setImage(uplodUrl)
+      // or add a doc 
     } else {
       alert('You did not select any image.');
     }
@@ -59,16 +95,15 @@ const Chat = () => {
     )
     const { _id, createdAt, text, user } = messages[0]
     console.log("before add ");
-    // console.log(image);
+    console.log(image);
     await addDoc(collection(FIREBASE_DB, "chats"), {
       _id, createdAt, text, user, image
     })
+    // setImage(null)
 
   }, [])
   return (
     <GiftedChat
-
-
       messages={messages}
       text={text}
       // isTyping
@@ -136,9 +171,7 @@ const Chat = () => {
               //   const galleryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
               //   setHasGalleryPermission(galleryStatus.status == "granted")
               // })()
-
               await pickImage()
-              // console.log('Choose From Library');
             },
             Cancel: () => {
               console.log('Cancel from Library');
@@ -156,47 +189,7 @@ const Chat = () => {
 
         }}
         primaryStyle={{ alignItems: 'center' }}
-      />
-
-
-      }
-      // renderSystemMessage = {(props) => (
-      //   <SystemMessage
-      //     {...props}
-      //     containerStyle={{ backgroundColor: 'pink' }}
-      //     wrapperStyle={{ borderWidth: 10, borderColor: 'white' }}
-      //     textStyle={{ color: 'crimson', fontWeight: '900' }}
-      //   />
-      // )}
-      // renderBubble= {(props) => (
-      //   <Bubble
-      //     {...props}
-      //     // renderTime={() => <Text>Time</Text>}
-      //     // renderTicks={() => <Text>Ticks</Text>}
-      //     containerStyle={{
-      //       left: { borderColor: 'teal', borderWidth: 8 },
-      //       right: {},
-      //     }}
-      //     wrapperStyle={{
-      //       left: { borderColor: 'tomato', borderWidth: 4 },
-      //       right: {},
-      //     }}
-      //     bottomContainerStyle={{
-      //       left: { borderColor: 'purple', borderWidth: 4 },
-      //       right: {},
-      //     }}
-      //     tickStyle={{}}
-      //     usernameStyle={{ color: 'tomato', fontWeight: '100' }}
-      //     containerToNextStyle={{
-      //       left: { borderColor: 'navy', borderWidth: 4 },
-      //       right: {},
-      //     }}
-      //     containerToPreviousStyle={{
-      //       left: { borderColor: 'mediumorchid', borderWidth: 4 },
-      //       right: {},
-      //     }}
-      //   />
-      // )}
+      />}
       renderUsernameOnMessage
       showAvatarForEveryMessage
       scrollToBottom
